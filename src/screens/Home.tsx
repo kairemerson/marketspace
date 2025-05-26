@@ -1,34 +1,117 @@
 import { ProductCard } from "@components/ProductCard";
 import { HomeHeader } from "@components/Homeheader";
-import { Box, Checkbox, CheckboxGroup, CheckboxIcon, Heading, HStack, Radio, RadioGroup, Text, View, VStack } from "@gluestack-ui/themed";
+import { Box, Center, Checkbox, CheckboxGroup, CheckboxIcon, Heading, HStack, Radio, RadioGroup, Text, useToast, View, VStack } from "@gluestack-ui/themed";
 
 import AdsSvg from "@assets/ads.svg"
 import SearchSvg from "@assets/Search.svg"
 import FilterSvg from "@assets/Filter.svg"
 import { gluestackUIConfig } from "../../config/gluestack-ui.config";
 import { ArrowRight, CheckIcon, X } from "lucide-react-native";
-import { Modal, Switch, TouchableOpacity } from "react-native";
+import { Modal, Switch, TouchableOpacity, FlatList } from "react-native";
 import { Input } from "@components/Input";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@components/Button";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { api } from "@services/api";
+import { ProductDTO } from "@dtos/ProductsDTO";
+import { AppError } from "@utils/AppError";
+import { ToastMessage } from "@components/ToastMessage";
+import { Loading } from "@components/Loading";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { AppTabParamList } from "@routes/Tabs";
 
 
 export function Home() {
 
     const [showFilterModal, setShowFilterModal] = useState(false)
-    const [productCondition, setProductCondition] = useState('new');
+    const [search, setSearch] = useState("")
+    const [is_new, setIs_new] = useState(true);
     const [acceptsTrade, setAcceptsTrade] = useState(false);
     const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
-    const navigation = useNavigation()
+    const [products, setProducts] = useState<ProductDTO[]>([])
+    const [quantityOfAds, setQuantityOfAds] = useState(0)
+
+    const [isLoadingMyAds, setIsLoadingMyAds] = useState(true);
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+    const navigation = useNavigation<NativeStackNavigationProp<AppTabParamList>>()
+
+    const toast = useToast()
 
     const {tokens} = gluestackUIConfig  
     
-    function handleFilters(){
-        console.log(productCondition, acceptsTrade, paymentMethods);
+    async function handleFetchFilters(){
+        // console.log(productCondition, acceptsTrade, paymentMethods);
+        try {
+
+            let paymentMethodsQuery = ""
+
+            paymentMethods.forEach((method)=> {
+                paymentMethodsQuery = paymentMethodsQuery + `&payment_methods=${method}`
+            })
+            const response = await api.get(`/products/?is_new=${is_new}&accept_trade=${acceptsTrade}${paymentMethodsQuery}${search.length > 0 && `&query=${search}`}`)
+
+            setProducts(response.data)
+            setShowFilterModal(false)
+            
+        } catch (error) {
+            const isAppError = error instanceof AppError;
+            const title = isAppError
+                ? error.message
+                : "Não foi possível receber os produtos. Tente Novamente!";
+
+            if (isAppError) {
+                toast.show({
+                    placement: "top",
+                    render: ({id})=> (
+                        <ToastMessage id={id} action="error" title={title} onClose={()=> toast.close(id)}/>
+                    )
+                })    
+            };
+        }
         
     }
+
+    function handleResetFilters() {
+        setIs_new(true)
+        setAcceptsTrade(false)
+        setPaymentMethods([""])
+        setSearch("")
+    }
+
+    useFocusEffect(useCallback(()=> {
+        async function loadData(){
+            setIsLoadingProducts(true)
+            try {
+                const productsData = await api.get("/products")
+                const userProductsData = await api.get("/users/products")
+
+                setProducts(productsData.data)
+                setQuantityOfAds(userProductsData.data.length)
+                
+            } catch (error) {
+                const isAppError = error instanceof AppError
+
+                const title = isAppError ? error.message : "Não foi possível receber os produtos. Tente Novamente"
+
+                if(isAppError){
+                    toast.show({
+                        placement: "top",
+                        render: ({id})=> (
+                            <ToastMessage id={id} action="error" title={title} onClose={()=> toast.close(id)}/>
+                        )
+                    })
+                }
+            } finally {
+                setIsLoadingMyAds(false)
+                setIsLoadingProducts(false)
+            }
+
+        }
+
+        loadData()
+    }, []))
 
     return(
         <>
@@ -38,11 +121,15 @@ export function Home() {
 
                 <HStack bg="$blueGray200" width="$full" padding={16} alignItems="center" gap={16} borderRadius={6}>
                     <AdsSvg fill={tokens.colors.blue} width={24} height={24}/>
-                    <VStack flex={1}>
-                        <Heading fontFamily="$heading" color="$gray200" fontSize="$xl">4</Heading>
-                        <Text fontFamily="$body" color="$gray200" fontSize="$xs">anúncios ativos</Text>
-                    </VStack>
-                    <TouchableOpacity>
+
+                    {isLoadingMyAds ? <Loading/> : (
+                        <VStack flex={1}>
+                            <Heading fontFamily="$heading" color="$gray200" fontSize="$xl">{quantityOfAds}</Heading>
+                            <Text fontFamily="$body" color="$gray200" fontSize="$xs">anúncios ativos</Text>
+                        </VStack>
+                    )}
+
+                    <TouchableOpacity onPress={()=> navigation.navigate("my_ads_stack")}>
                         <HStack alignItems="center" gap={6}>
                             <Text color="$blue" fontSize="$xs" fontWeight="$bold">Meus anúncios</Text>
                             <ArrowRight color={tokens.colors.blue} width={16} height={16}/>
@@ -54,9 +141,9 @@ export function Home() {
                 <Text color="$gray200" fontSize="$sm" mt="$8" mb="$4">Compre produtos variados</Text>
 
                 <HStack bg="$gray700" w="$full" px="$2" py="$2" h={45} rounded={6} alignItems="center" gap={10}>
-                    <Input placeholder="Buscar anúncio" flex={1}/>
+                    <Input placeholder="Buscar anúncio" flex={1} value={search} onChangeText={setSearch}/>
                     <TouchableOpacity>
-                        <SearchSvg width={22} height={22} />
+                        <SearchSvg width={22} height={22} onPress={handleFetchFilters}/>
                     </TouchableOpacity>
                         <Text color="$gray400" fontSize={20}>|</Text>
                     <TouchableOpacity onPress={()=> setShowFilterModal(true)}>
@@ -64,10 +151,33 @@ export function Home() {
                     </TouchableOpacity>
                 </HStack>
 
-                <TouchableOpacity onPress={()=> navigation.navigate("logout")}>
-                    <ProductCard/>
+                {isLoadingProducts ? <Loading/> : (
+                    <FlatList<ProductDTO>
+                        style={{flex: 1, marginTop: 20}}
+                        columnWrapperStyle={{ justifyContent: "space-between" }}
+                        numColumns={2}
+                        data={products}
+                        keyExtractor={(item)=> item.id}
+                        renderItem={({item})=> (
+                            <ProductCard
+                                id={item.id}
+                                title={item.name}
+                                image={`${api.defaults.baseURL}/images/${item.product_images[0].path}`}
+                                active={item.is_active}
+                                is_new={item.is_new}
+                                price={item.price}
+                                profileImage={`${api.defaults.baseURL}/images/${item.user?.avatar}`}
+                            />
 
-                </TouchableOpacity>
+
+                        )}
+                        ListEmptyComponent={()=> (
+                            <Center flex={1}>
+                                <Text>Nenhum anúncio para exibir</Text>
+                            </Center>
+                        )}
+                    />
+                )}
 
             </VStack>
 
@@ -93,16 +203,16 @@ export function Home() {
                         <Text fontSize="$lg" fontWeight="$bold">Condição</Text>
                         
                         <RadioGroup
-                            value={productCondition}
-                            onChange={setProductCondition}
+                            value={is_new === true ? "true" : "false"}
+                            onChange={(val) => setIs_new(val === "true")}
                             flexDirection="row"
                             gap={10}
                             >
-                            <Radio value="new">
+                            <Radio value="true">
                                 {/* <Radio.Indicator /> */}
-                                <Radio.Label bg={productCondition === "new" ? "$bluelight" : "$gray500"} rounded="$xl" pl="$4" pr={productCondition === "new" ? "$8" : "$4"} py="$1" color={productCondition === "new" ? "$white" : "$gray300"}>NOVO</Radio.Label>
+                                <Radio.Label bg={is_new === true ? "$bluelight" : "$gray500"} rounded="$xl" pl="$4" pr={is_new === true ? "$8" : "$4"} py="$1" color={is_new === true ? "$white" : "$gray300"}>NOVO</Radio.Label>
                                 {/* {productCondition === "new" && (<Text position="absolute" right={5} px={6} lineHeight={20} fontSize={20} rounded="$full" bg="$gray600">x</Text>)} */}
-                                {productCondition === "new" && (
+                                {is_new === true && (
                                     <Box
                                         position="absolute"
                                         right={5}
@@ -118,10 +228,10 @@ export function Home() {
                                     </Box>
                                 )}
                             </Radio>
-                            <Radio value="used">
+                            <Radio value="false">
                                 {/* <Radio.Indicator /> */}
-                                <Radio.Label bg={productCondition === "used" ? "$bluelight" : "$gray500"} rounded="$xl" pl="$4" pr={productCondition === "used" ? "$8" : "$4"}  py="$1" color={productCondition === "used" ? "$white" : "$gray300"}>USADO</Radio.Label>
-                                {productCondition === "used" && (
+                                <Radio.Label bg={is_new === false ? "$bluelight" : "$gray500"} rounded="$xl" pl="$4" pr={is_new === false ? "$8" : "$4"}  py="$1" color={is_new === false ? "$white" : "$gray300"}>USADO</Radio.Label>
+                                {is_new === false && (
                                     <Box
                                         position="absolute"
                                         right={5}
@@ -187,8 +297,8 @@ export function Home() {
                     </VStack>
 
                     <Box w="$full" gap={16} flexDirection="row" marginTop="auto">
-                        <Button title="Resetar filtros" customVariant="neutral" flex={1}/>
-                        <Button title="Aplicar filtros" customVariant="secondary" flex={1} onPress={()=> handleFilters()}/>
+                        <Button title="Resetar filtros" customVariant="neutral" flex={1} onPress={handleResetFilters}/>
+                        <Button title="Aplicar filtros" customVariant="secondary" flex={1} onPress={()=> handleFetchFilters()}/>
                     </Box>
 
                 </View>

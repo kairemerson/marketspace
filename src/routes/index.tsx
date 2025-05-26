@@ -2,7 +2,7 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { gluestackUIConfig } from "../../config/gluestack-ui.config";
 import { Box } from "@gluestack-ui/themed";
 import { AuthRoutes } from "./auth.routes"
-import { AppRoutes } from "./app.routes";
+import { AppRoutes } from "./app.routes copy";
 import { UseAuth } from "@hooks/useAuth";
 import { Loading } from "@components/Loading";
 

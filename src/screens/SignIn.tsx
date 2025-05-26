@@ -88,7 +88,7 @@ export function SignIn() {
                         />
 
                     </Center>
-                        <Button title="Entrar" w="$full" onPress={handleSubmit(handleSignIn)}/>
+                        <Button title="Entrar" w="$full" onPress={handleSubmit(handleSignIn)} isLoading={isLoading}/>
                 </Center>
                 <Center bg="$gray700" flex={1} paddingHorizontal={46}>
                     <Text color="$gray200" fontFamily="$body" fontSize={14} fontWeight="$normal" mb={16}>Ainda não tem acesso?</Text>

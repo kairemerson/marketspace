@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Switch, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { AppNavigatorRoutesProps } from "@routes/app.routes";
-import { Box, Center, Checkbox, CheckboxGroup, CheckboxIcon, Heading, HStack, Image, onChange, Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel, ScrollView, Text, useToast, VStack } from "@gluestack-ui/themed";
+import { Box, Center, Checkbox, CheckboxGroup, CheckboxIcon, Heading, HStack, Image, onChange, Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel, ScrollView, Text, useToast, View, VStack } from "@gluestack-ui/themed";
 import { gluestackUIConfig } from "../../config/gluestack-ui.config";
 
 import * as ImagePicker from "expo-image-picker";
@@ -17,8 +17,20 @@ import * as yup from "yup"
 import { yupResolver } from "@hookform/resolvers/yup";
 import { ToastMessage } from "@components/ToastMessage";
 import { AppError } from "@utils/AppError";
+import { api } from "@services/api";
 
 type PaymentMethods = "pix" | "deposit" | "cash" | "boleto" | "card"
+
+type RouteParams = {
+    id: string
+    title: string;
+    description: string;
+    price: number;
+    imagesParams: any[];
+    payment_methods: {key: string, name: string}[];
+    is_new: boolean;
+    accept_trade: boolean;
+}
 
 type FormData = {
     title: string
@@ -38,11 +50,15 @@ const newAdSchema = yup.object({
     payment_methods: yup.array().of(yup.string()).min(1, "Selecione pelo menos uma forma de pagamento")
 })
 
-export function NewAd() {
+export function EditAd() {
 
     const [images, setImages] = useState<any[]>([]);
 
     const navigation = useNavigation<AppNavigatorRoutesProps>()
+
+    const route = useRoute()
+    const {id, title, description, is_new, price, accept_trade, imagesParams, payment_methods} = route.params as RouteParams
+    const normalizedPaymentMethods: PaymentMethods[] = payment_methods.map((method)=> method.key) as PaymentMethods[]
 
     const toast = useToast()
 
@@ -50,16 +66,19 @@ export function NewAd() {
         
         resolver: yupResolver(newAdSchema),
         defaultValues: {
-            is_new: true,
-            accept_trade: false,
-            payment_methods: [],
+            title: title,
+            description: description,
+            price: price,
+            is_new: is_new,
+            accept_trade: accept_trade,
+            payment_methods: normalizedPaymentMethods,
         }
     })
 
     const tokens = gluestackUIConfig.tokens
 
     function handleGoBack(){
-        navigation.navigate("home")
+        navigation.goBack()
     }
 
     function resetForm() {
@@ -68,7 +87,6 @@ export function NewAd() {
     }
 
     function handlePreview({title, description, is_new, price, accept_trade, payment_methods}: FormData) {
-        console.log({title, description, is_new, price, accept_trade, payment_methods});
         
         if(images.length === 0){
             return toast.show({
@@ -86,11 +104,23 @@ export function NewAd() {
                     <ToastMessage id={id} action="error" title="Selecione ao menos um meio de pagamento" onClose={()=> toast.close(id)}/>
                 )
             })
-        }
+        }        
 
-        navigation.navigate("preview_ad", {
-            title, description, price, images, payment_methods, is_new, accept_trade, onResetForm: resetForm
-        })
+        navigation.getParent()?.navigate("home_stack", {
+            screen: "preview_ad",
+            params: {
+                id: id, 
+                title: title, 
+                description: description, 
+                price: price, 
+                images: images, 
+                payment_methods: payment_methods, 
+                is_new: is_new, 
+                accept_trade: accept_trade
+
+            }
+        }
+        )
     }
 
     async function handleAdPhoto() {
@@ -165,6 +195,50 @@ export function NewAd() {
     }
 
     
+    async function handleRemovePhoto(id: string){
+        const imagesToDelete: string[] = [id]
+        
+        try {
+            console.log("Removendo imagem com ID:", imagesToDelete);
+            
+            await api.delete(`/products/images`, {
+                data: {
+                    productImagesIds: imagesToDelete
+                }
+            })
+            
+            setImages((prevState => prevState.filter(image => image.id !== id)))
+
+            toast.show({
+                placement: "top",
+                render: ({id})=> (
+                    <ToastMessage id={id} action="success" title="Imagem removida com sucesso" onClose={()=> toast.close(id)}/>
+                )
+            })
+
+        } catch (error) {
+            console.log("error",error);
+            
+            const isAppError = error instanceof AppError;
+            const title = isAppError
+                ? error.message
+                : "Não foi possível remover a imagem. Tente novamente!";
+
+            if(isAppError) {
+                toast.show({
+                    placement: "top",
+                    render: ({id})=> (
+                        <ToastMessage id={id} action="error" title={title} onClose={()=> toast.close(id)}/>
+                    )
+                })
+            }
+        }
+    }
+
+    useEffect(()=> {
+        setImages(imagesParams)
+        
+    }, imagesParams)
 
     return (
         <ScrollView contentContainerStyle={{flexGrow: 1, paddingVertical: 40, paddingHorizontal: 24}} showsVerticalScrollIndicator={false}>
@@ -175,7 +249,7 @@ export function NewAd() {
                     </TouchableOpacity>
               
 
-                <Heading color="$gray100">Meus anúncios</Heading>
+                <Heading color="$gray100">Editar anúncio</Heading>
             </Center>
 
             <Text fontFamily="$heading" fontSize="$md" color="$gray200" fontWeight="bold">Imagens</Text>
@@ -184,16 +258,22 @@ export function NewAd() {
             <HStack gap={8} marginTop="$3">
                 {images.length > 0 && 
                     images.map((imageData)=> (
-                        <Image
-                            key={imageData.uri}
-                            width={100}
-                            height={100}
-                            mr="$1"
-                            source={{uri: imageData.uri}}
-                            alt="imagem do produto"
-                            resizeMode="cover"
-                            borderRadius={8}
-                        />
+                        <View key={imageData.id}>
+                            <TouchableOpacity  style={{position: "relative"}} onPress={()=> handleRemovePhoto(imageData.id)}>
+                                <Text position="absolute" bg="$gray200" color="$white" textAlign="center" fontFamily="$body" fontSize={14} width={20} height={20} top={4} right={6} zIndex={1} rounded={16}>X</Text>
+                                <Image
+                                    
+                                    width={100}
+                                    height={100}
+                                    mr="$1"
+                                    source={{uri: !imageData.path ? imageData.uri : `${api.defaults.baseURL}/images/${imageData.path}`}}
+                                    alt="imagem do produto"
+                                    resizeMode="cover"
+                                    borderRadius={8}
+                                />
+                            </TouchableOpacity>
+
+                        </View>
                     ))
                 }
                 {images.length < 3 && (
@@ -257,7 +337,7 @@ export function NewAd() {
                     control={control}
                     name="price"
                     render={({field: {onChange, value}})=> (
-                        <Input placeholder="Valor do produto" value={value} onChangeText={onChange} errorMessage={errors.price?.message}/>
+                        <Input placeholder="Valor do produto" value={String(value)} onChangeText={onChange} errorMessage={errors.price?.message}/>
 
                     )}
                 />

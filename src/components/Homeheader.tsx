@@ -6,6 +6,7 @@ import { gluestackUIConfig } from "../../config/gluestack-ui.config";
 import { useNavigation } from "@react-navigation/native";
 import { AppNavigatorRoutesProps } from "@routes/app.routes";
 import { UseAuth } from "@hooks/useAuth";
+import { api } from "@services/api";
 
 
 export function HomeHeader() {
@@ -18,7 +19,7 @@ export function HomeHeader() {
 
     return(
         <HStack gap={8} alignItems="center" pt="$16" pb="$5" >
-            <UserPhoto source={{uri: "https://github.com/kairemerson.png"}} alt="foto perfil" w="$12" h="$12" />
+            <UserPhoto source={{uri: `${api.defaults.baseURL}/images/${user.avatar}`}} alt="foto perfil" w="$12" h="$12" />
             <VStack flex={1}>
                 <Text color="$gray100" fontSize="$md">Boas vindas,</Text>
                 <Heading color="$gray100" fontSize="$md">{user.name}</Heading>

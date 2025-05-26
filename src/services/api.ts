@@ -11,13 +11,16 @@ api.interceptors.response.use((response)=> {
     return response
 }, (error)=> {
 
-    if(error.response && error.response.data){
-        return Promise.reject(new AppError(error.response.data.message))
-        
-    }else {
-        
-        return Promise.reject(error)
-        
+    console.error("API ERROR:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
+
+    if (error.response && error.response.data?.message) {
+      return Promise.reject(new AppError(error.response.data.message))
+    } else {
+      return Promise.reject(error)
     }
 })
 

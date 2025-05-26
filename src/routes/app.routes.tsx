@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform, TouchableOpacity } from "react-native";
 import { BottomTabNavigationProp, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Home } from "@screens/Home";
 import { MyAds } from "@screens/MyAds";
@@ -11,14 +11,20 @@ import { AdDetails } from "@screens/AdDetails";
 import { MyAdDetails } from "@screens/MyAdDetails";
 import { NewAd } from "@screens/NewAd";
 import { PreviewAd } from "@screens/PreviewAd";
+import { UseAuth } from "@hooks/useAuth";
+import { Logout } from "@screens/Logout";
 
 
 type AppRoutes = {
     home: undefined
     my_ads: undefined
     logout: undefined
-    ad_details: undefined
-    my_ad_details: undefined
+    ad_details: {
+        id: string
+    }
+    my_ad_details: {
+        id: string
+    }
     new_ad: undefined
     preview_ad: {
         title: string;
@@ -28,6 +34,7 @@ type AppRoutes = {
         payment_methods: string[];
         is_new: boolean;
         accept_trade: boolean;
+        onResetForm: ()=> void
     }
 }
 
@@ -35,8 +42,11 @@ export type AppNavigatorRoutesProps = BottomTabNavigationProp<AppRoutes>
 
 const {Navigator, Screen} = createBottomTabNavigator<AppRoutes>()
 
+
+
 export function AppRoutes() {
 
+    const {signOut} = UseAuth()
     const {tokens} = gluestackUIConfig
 
     return (
@@ -63,12 +73,12 @@ export function AppRoutes() {
                 component={MyAds}
                 options={{tabBarIcon: ({color})=> <AdsSvg fill={color}/>}}
             />
+
             <Screen 
                 name="logout" 
-                component={AdDetails}
+                component={Logout}
                 options={{
                     tabBarIcon: ()=> <LogOutSvg/>,
-                    tabBarStyle: {display: "none"}
                 }}
             />
             <Screen 

@@ -1,5 +1,7 @@
 import './src/polyfills/backHandlerFix'; 
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 import { StatusBar } from 'react-native';
 
 import {useFonts, Karla_400Regular, Karla_700Bold} from "@expo-google-fonts/karla"
@@ -15,10 +17,12 @@ export default function App() {
 
   return (
     <GluestackUIProvider config={config}>
+      <GestureHandlerRootView>
+        <AuthContextProvider>
+          {fontsLoaded ? <Routes/>: <Loading/>}
+        </AuthContextProvider>
 
-      <AuthContextProvider>
-        {fontsLoaded ? <Routes/>: <Loading/>}
-      </AuthContextProvider>
+      </GestureHandlerRootView>
 
       <StatusBar barStyle="light-content" backgroundColor='transparent' translucent/>
 

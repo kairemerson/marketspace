@@ -1,27 +1,61 @@
-import { HStack, Image, Text, View, VStack } from "@gluestack-ui/themed";
+import { Center, HStack, Image, Text, View, VStack } from "@gluestack-ui/themed";
 import { UserPhoto } from "./UserPhoto";
-import Image1 from"@assets/Image1.png"
 import { StatusTag } from "./StatusTag";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { TouchableOpacity } from "react-native";
+import { AppNavigatorRoutesProps } from "@routes/app.routes";
 
-export function ProductCard() {
+type Props = {
+    id: string
+    title: string
+    price: number
+    is_new: boolean
+    active: boolean
+    image: string
+    profileImage: string
+}
 
+export function ProductCard({id, title, price, is_new, active=true, image, profileImage}: Props) {
+
+    const navigation = useNavigation<AppNavigatorRoutesProps>()
+    
     const route = useRoute()
 
+    function navigateNextPage(){
+        if(route.name === "my_ads") {
+            navigation.navigate("my_ad_details", {id: id})
+        }
+
+        if(route.name === "home") {
+            navigation.navigate("ad_details", {id: id})
+        }
+    }
+
     return (
-        <VStack width="$1/2">
-            <HStack position="absolute" zIndex={1} padding={5} alignItems="center" justifyContent="space-between" w="$full">
-                {route.name === "my_ads" ? <View></View>: (
+        <TouchableOpacity onPress={()=> navigateNextPage()} style={{width: "47%", marginTop: 16}}>
+            <VStack flex={1}>
+                
+                <HStack position="absolute" zIndex={1} padding={5} alignItems="center" justifyContent="space-between" w="$full">
+                    {route.name === "my_ads" ? <View></View>: (
+                        
+                        <UserPhoto source={{uri: profileImage ? profileImage : "https://github.com/kairemerson.png"}} alt="foto perfil" w="$7" h="$7"/>
+                    )}
+                    <StatusTag variant={is_new ? "primary" : "secondary"}>{is_new ? "Novo" : "Usado"}</StatusTag>
+                </HStack>
+                
+                {!active && (
+                    <Center position="absolute" pb='$2' zIndex={1} height={120} w="$full">
+                        <Text color="$gray700" marginTop="auto">Anúncio Desativado</Text>
 
-                <UserPhoto source={{uri: "https://github.com/kairemerson.png"}} alt="foto perfil" w="$7" h="$7"/>
+                    </Center>
                 )}
-                <StatusTag>novo</StatusTag>
-            </HStack>
-            <Image source={Image1} w="$full" h={120} resizeMode="cover" borderRadius={10} alt="produto"/>
 
-            <Text fontFamily="$body" fontSize="$sm" color="$gray200" mt="$2">Tênis vermelho</Text>
-            <Text fontFamily="$heading" fontSize="$md" color="$gray100" mt="$1">R$ 59,90</Text>
+                <Image source={{uri: image}} w="$full" h={120} resizeMode="cover" borderRadius={10} blurRadius={active ? 0 : 10} alt={title} /> 
 
-        </VStack>
+                <Text fontFamily="$body" fontSize="$sm" color={ active ? "$gray200" : "$gray400"} mt="$2">{title}</Text>
+                <Text fontFamily="$heading" fontSize="$md" color={active ? "$gray100" : "$gray400"} mt="$1">R$ {price}</Text>
+
+            </VStack>
+        </TouchableOpacity>
     )
 }
